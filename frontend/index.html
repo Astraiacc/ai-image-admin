@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI图像管理系统 - 百度AI驱动</title>
+<style>
+  :root {
+    --primary: #4361ee;
+    --primary-light: #eef0fd;
+    --success: #2cb67d;
+    --success-light: #e8f8f1;
+    --warning: #f7c037;
+    --warning-light: #fef9e7;
+    --danger: #e63946;
+    --danger-light: #fdecea;
+    --gray-50: #f8f9fa;
+    --gray-100: #f1f3f5;
+    --gray-200: #e9ecef;
+    --gray-300: #dee2e6;
+    --gray-500: #adb5bd;
+    --gray-600: #868e96;
+    --gray-700: #495057;
+    --gray-900: #212529;
+    --sidebar-w: 240px;
+    --header-h: 60px;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 14px; color: var(--gray-900); background: var(--gray-100); display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w); background: #fff; border-right: 1px solid var(--gray-200);
+    display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; bottom: 0; left: 0; z-index: 100;
+  }
+  .sidebar-logo {
+    height: var(--header-h); display: flex; align-items: center; gap: 10px; padding: 0 20px;
+    border-bottom: 1px solid var(--gray-200); font-size: 16px; font-weight: 600; color: var(--primary);
+  }
+  .sidebar-logo .logo-icon { width: 32px; height: 32px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+  .nav-section { padding: 16px 12px 8px; font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: .06em; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    color: var(--gray-700); transition: all .15s; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--gray-100); }
+  .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 500; }
+  .nav-item .icon { font-size: 17px; width: 22px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 16px; border-top: 1px solid var(--gray-200); font-size: 12px; color: var(--gray-600); }
+  .api-status { display: flex; align-items: center; gap: 6px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-300); }
+  .status-dot.ok { background: var(--success); }
+  .status-dot.err { background: var(--danger); }
+
+  /* ── Main ── */
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    height: var(--header-h); background: #fff; border-bottom: 1px solid var(--gray-200);
+    display: flex; align-items: center; padding: 0 24px; gap: 12px; position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 7px;
+    font-size: 13px; cursor: pointer; border: 1px solid var(--gray-300); background: #fff; color: var(--gray-700);
+    transition: all .15s; font-family: inherit; white-space: nowrap;
+  }
+  .btn:hover { background: var(--gray-100); }
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-primary:hover { background: #3251d3; border-color: #3251d3; }
+  .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .btn-danger:hover { background: #c1121f; border-color: #c1121f; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Content ── */
+  .content { flex: 1; padding: 24px; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Stats Cards ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: #fff; border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 12px; color: var(--gray-600); margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 600; line-height: 1; }
+  .stat-card.total .stat-value { color: var(--primary); }
+  .stat-card.done .stat-value { color: var(--success); }
+  .stat-card.analyzing .stat-value { color: var(--warning); }
+  .stat-card.error .stat-value { color: var(--danger); }
+
+  /* ── Upload Zone ── */
+  .upload-zone {
+    background: #fff; border-radius: var(--radius); box-shadow: var(--shadow);
+    border: 2px dashed var(--gray-300); padding: 40px; text-align: center; cursor: pointer; transition: all .2s;
+    margin-bottom: 24px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+  .upload-icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-hint { color: var(--gray-600); font-size: 13px; margin-top: 6px; }
+  .upload-hint strong { color: var(--primary); }
+  #fileInput { display: none; }
+
+  /* ── Toolbar ── */
+  .toolbar { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .search-box { flex: 1; min-width: 200px; position: relative; }
+  .search-box input { width: 100%; padding: 7px 12px 7px 34px; border: 1px solid var(--gray-300); border-radius: 7px; font-size: 13px; outline: none; font-family: inherit; }
+  .search-box input:focus { border-color: var(--primary); }
+  .search-box .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--gray-500); }
+  select { padding: 7px 10px; border: 1px solid var(--gray-300); border-radius: 7px; font-size: 13px; font-family: inherit; outline: none; cursor: pointer; }
+  select:focus { border-color: var(--primary); }
+  .selected-info { font-size: 13px; color: var(--gray-600); }
+
+  /* ── Image Grid ── */
+  .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .image-card {
+    background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    cursor: pointer; transition: all .2s; border: 2px solid transparent;
+  }
+  .image-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .image-card.selected { border-color: var(--primary); }
+  .image-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--gray-100); }
+  .image-thumb-placeholder { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: var(--gray-100); font-size: 32px; }
+  .image-info { padding: 10px 12px; }
+  .image-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .image-meta { font-size: 11px; color: var(--gray-600); display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-success { background: var(--success-light); color: var(--success); }
+  .badge-warning { background: var(--warning-light); color: #b88a00; }
+  .badge-danger { background: var(--danger-light); color: var(--danger); }
+  .badge-secondary { background: var(--gray-100); color: var(--gray-600); }
+  .image-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .tag { background: var(--primary-light); color: var(--primary); font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+  .card-checkbox { position: absolute; top: 8px; left: 8px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 780px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 18px 24px; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 16px; font-weight: 600; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--gray-600); line-height: 1; padding: 2px; }
+  .modal-body { padding: 24px; overflow-y: auto; display: flex; gap: 24px; flex-wrap: wrap; }
+  .modal-img-wrap { flex: 0 0 280px; max-width: 280px; }
+  .modal-img { width: 100%; border-radius: 10px; object-fit: contain; border: 1px solid var(--gray-200); max-height: 280px; }
+  .modal-details { flex: 1; min-width: 0; }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title { font-size: 12px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--gray-100); font-size: 13px; }
+  .detail-label { color: var(--gray-600); }
+  .detail-val { font-weight: 500; max-width: 60%; text-align: right; word-break: break-all; }
+  .ai-item { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--gray-100); }
+  .confidence-bar { height: 4px; background: var(--gray-200); border-radius: 2px; margin-top: 2px; overflow: hidden; }
+  .confidence-fill { height: 100%; background: var(--success); border-radius: 2px; transition: width .4s; }
+  .ocr-text { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 7px; padding: 10px 12px; font-size: 13px; line-height: 1.7; color: var(--gray-700); max-height: 120px; overflow-y: auto; word-break: break-all; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* ── Upload Progress ── */
+  .upload-progress-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 16px; display: none; }
+  .progress-bar-track { height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress-bar-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width .3s; }
+  .progress-text { font-size: 13px; color: var(--gray-700); }
+
+  /* ── Toast ── */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { background: var(--gray-900); color: #fff; padding: 11px 18px; border-radius: 9px; font-size: 13px; animation: slideInUp .2s; max-width: 320px; pointer-events: all; }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--danger); }
+  .toast.warning { background: #d97706; }
+  @keyframes slideInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Empty / Loading ── */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-600); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin .7s linear infinite; }
+
+  /* ── Settings Page ── */
+  .settings-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; max-width: 580px; margin-bottom: 20px; }
+  .settings-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-200); }
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 13px; font-weight: 500; margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 7px;
+    font-size: 13px; font-family: inherit; outline: none;
+  }
+  .form-input:focus { border-color: var(--primary); }
+  .form-hint { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 24px; }
+  .page-btn { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--gray-300); background: #fff; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .page-btn:hover { background: var(--gray-100); }
+  .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .image-grid { grid-template-columns: repeat(2, 1fr); }
+    .modal-body { flex-direction: column; }
+    .modal-img-wrap { flex: none; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🤖</div>
+    <span>AI图像管理</span>
+  </div>
+  <div style="padding:12px;flex:1">
+    <div class="nav-section">主菜单</div>
+    <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> 仪表盘</div>
+    <div class="nav-item" onclick="showPage('images')"><span class="icon">🖼️</span> 图片管理</div>
+    <div class="nav-item" onclick="showPage('upload')"><span class="icon">📤</span> 上传分析</div>
+    <div class="nav-section">系统</div>
+    <div class="nav-item" onclick="showPage('settings')"><span class="icon">⚙️</span> 系统设置</div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="api-status">
+      <div class="status-dot" id="apiStatusDot"></div>
+      <span id="apiStatusText">检查API连接...</span>
+    </div>
+    <div style="margin-top:6px;color:var(--gray-500)">百度AI开放平台</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="pageTitle">仪表盘</span>
+    <div class="topbar-actions">
+      <button class="btn" onclick="loadStats();loadImages()">🔄 刷新</button>
+      <button class="btn btn-primary" onclick="showPage('upload')">📤 上传图片</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card total"><div class="stat-label">全部图片</div><div class="stat-value" id="stat-total">-</div></div>
+        <div class="stat-card done"><div class="stat-label">已分析完成</div><div class="stat-value" id="stat-done">-</div></div>
+        <div class="stat-card analyzing"><div class="stat-label">分析中</div><div class="stat-value" id="stat-analyzing">-</div></div>
+        <div class="stat-card error"><div class="stat-label">分析失败</div><div class="stat-value" id="stat-error">-</div></div>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 24px;margin-bottom:20px">
+        <div style="font-size:15px;font-weight:600;margin-bottom:16px">快速操作</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="showPage('upload')">📤 上传新图片</button>
+          <button class="btn" onclick="showPage('images')">🖼️ 查看所有图片</button>
+          <button class="btn" onclick="showPage('settings')">⚙️ 配置百度AI Key</button>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 24px">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px">系统说明</div>
+        <div style="color:var(--gray-600);font-size:13px;line-height:1.8">
+          本系统集成<strong>百度AI开放平台</strong>，支持以下能力：<br>
+          · <strong>通用物体和场景识别</strong> — 识别图片中的物体、场景类别和标签<br>
+          · <strong>OCR文字识别</strong> — 提取图片中的中英文文字内容<br>
+          · <strong>图像主体检测</strong> — 定位图片中的主体对象<br>
+          上传图片后系统将自动调用AI接口进行分析，结果会实时更新展示。
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload Page -->
+    <div class="page" id="page-upload">
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">📁</div>
+        <div style="font-size:16px;font-weight:500;margin-bottom:6px">点击选择图片或拖拽到此处</div>
+        <div class="upload-hint">支持 JPG、PNG、GIF、BMP、WebP 格式，单文件最大 <strong>10MB</strong>，可批量上传</div>
+        <input type="file" id="fileInput" multiple accept="image/*" onchange="handleFileSelect(this.files)">
+      </div>
+
+      <div class="upload-progress-wrap" id="progressWrap">
+        <div class="progress-text" id="progressText">上传中...</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
+      </div>
+
+      <div id="previewList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:4px"></div>
+
+      <div style="margin-top:16px;display:flex;gap:10px" id="uploadActions" style="display:none">
+        <button class="btn btn-primary" id="uploadBtn" onclick="doUpload()" disabled>🚀 开始上传并分析</button>
+        <button class="btn" onclick="clearPreview()">✕ 清空</button>
+      </div>
+    </div>
+
+    <!-- Images Page -->
+    <div class="page" id="page-images">
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="搜索图片名称或标签..." oninput="debounceSearch()">
+        </div>
+        <select id="statusFilter" onchange="loadImages(1)">
+          <option value="">全部状态</option>
+          <option value="done">已完成</option>
+          <option value="analyzing">分析中</option>
+          <option value="error">失败</option>
+          <option value="pending">待处理</option>
+        </select>
+        <span class="selected-info" id="selectedInfo"></span>
+        <button class="btn btn-danger btn-sm" id="batchDeleteBtn" onclick="batchDelete()" style="display:none">🗑️ 批量删除</button>
+      </div>
+
+      <div id="imageGrid" class="image-grid"></div>
+      <div id="pagination" class="pagination"></div>
+    </div>
+
+    <!-- Settings Page -->
+    <div class="page" id="page-settings">
+      <div class="settings-card">
+        <div class="settings-title">🔑 百度AI开放平台配置</div>
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <input type="text" class="form-input" id="settingApiKey" placeholder="请输入百度AI API Key">
+          <div class="form-hint">前往 <a href="https://ai.baidu.com/ai-doc/REFERENCE/Ck3dwjhhu" target="_blank" style="color:var(--primary)">百度AI控制台</a> 创建应用获取</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Secret Key</label>
+          <input type="password" class="form-input" id="settingSecretKey" placeholder="请输入百度AI Secret Key">
+        </div>
+        <div class="form-group">
+          <label class="form-label">后端服务地址</label>
+          <input type="text" class="form-input" id="settingServerUrl" value="http://localhost:3001">
+          <div class="form-hint">Node.js后端服务的访问地址</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveSettings()">💾 保存配置</button>
+          <button class="btn" onclick="testApiConnection()">🔗 测试连接</button>
+        </div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-title">📋 配置说明</div>
+        <div style="font-size:13px;line-height:1.9;color:var(--gray-700)">
+          <strong>1. 申请百度AI接口</strong><br>
+          访问 <a href="https://ai.baidu.com/" target="_blank" style="color:var(--primary)">https://ai.baidu.com/</a> → 控制台 → 创建应用<br>
+          选择"图像识别"服务，获取 API Key 和 Secret Key<br><br>
+          <strong>2. 配置后端环境</strong><br>
+          在后端目录创建 <code style="background:var(--gray-100);padding:1px 5px;border-radius:3px">.env</code> 文件，填入：<br>
+          <code style="background:var(--gray-100);padding:4px 8px;border-radius:4px;display:block;margin:6px 0">BAIDU_API_KEY=你的APIKey<br>BAIDU_SECRET_KEY=你的SecretKey</code><br>
+          <strong>3. 启动后端</strong><br>
+          <code style="background:var(--gray-100);padding:4px 8px;border-radius:4px;display:block;margin:6px 0">cd backend<br>npm install<br>npm start</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Detail Modal -->
+<div class="modal-overlay" id="imageModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">图片详情</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="reanalyzeImage()" id="reanalyzeBtn">🔄 重新分析</button>
+      <button class="btn btn-danger" onclick="deleteImageFromModal()" id="deleteModalBtn">🗑️ 删除</button>
+      <button class="btn btn-primary" onclick="closeModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── Config & State ──
+// 自动检测：若页面是通过HTTP服务器打开，就用同源地址；否则用localhost:3001
+const _autoServer = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? (location.origin === 'null' ? 'http://localhost:3001' : location.origin)
+  : 'http://localhost:3001';
+const CONFIG = { serverUrl: localStorage.getItem('serverUrl') || _autoServer };
+let state = {
+  images: [], total: 0, page: 1, pageSize: 12,
+  selected: new Set(), currentImageId: null,
+  searchTimer: null, pendingFiles: []
+};
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  loadStats();
+  loadImages();
+  checkApiStatus();
+  // Drag and drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleFileSelect(e.dataTransfer.files); });
+});
+
+function getUrl(path) { return CONFIG.serverUrl + path; }
+
+// ── Toast ──
+function toast(msg, type = 'default', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`; el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ── Page Navigation ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  const titles = { dashboard: '仪表盘', images: '图片管理', upload: '上传分析', settings: '系统设置' };
+  document.getElementById('pageTitle').textContent = titles[name] || name;
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(item => { if (item.textContent.trim().includes(titles[name]?.slice(0,2))) item.classList.add('active'); });
+  if (name === 'dashboard') loadStats();
+  if (name === 'images') loadImages();
+}
+
+// ── Stats ──
+async function loadStats() {
+  try {
+    const res = await fetch(getUrl('/api/stats'));
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('stat-total').textContent = data.data.total;
+      document.getElementById('stat-done').textContent = data.data.done;
+      document.getElementById('stat-analyzing').textContent = data.data.analyzing;
+      document.getElementById('stat-error').textContent = data.data.error;
+    }
+  } catch (e) {}
+}
+
+// ── API Status ──
+async function checkApiStatus() {
+  const dot = document.getElementById('apiStatusDot');
+  const txt = document.getElementById('apiStatusText');
+  try {
+    const res = await fetch(getUrl('/api/health'), { signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+    dot.className = 'status-dot ok'; txt.textContent = '后端已连接';
+  } catch (e) {
+    dot.className = 'status-dot err'; txt.textContent = '后端未连接';
+  }
+}
+
+// ── Image Load ──
+async function loadImages(page) {
+  if (page) state.page = page;
+  const search = document.getElementById('searchInput')?.value || '';
+  const status = document.getElementById('statusFilter')?.value || '';
+  const url = getUrl(`/api/images?page=${state.page}&pageSize=${state.pageSize}&search=${encodeURIComponent(search)}&status=${status}`);
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.success) {
+      state.images = data.data;
+      state.total = data.pagination.total;
+      renderImageGrid();
+      renderPagination(data.pagination);
+    }
+  } catch (e) {
+    document.getElementById('imageGrid').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>无法连接到后端服务，请确认服务已启动</p><p style="font-size:12px;margin-top:6px">地址：${CONFIG.serverUrl}</p></div>`;
+  }
+}
+
+function renderImageGrid() {
+  const grid = document.getElementById('imageGrid');
+  if (!state.images.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🖼️</div><p>暂无图片，去上传一些吧</p></div>`;
+    return;
+  }
+  grid.innerHTML = state.images.map(img => `
+    <div class="image-card ${state.selected.has(img.id) ? 'selected' : ''}" onclick="toggleSelect(event, ${img.id})" ondblclick="openImageModal(${img.id})">
+      ${img.url ? `<img class="image-thumb" src="${getUrl(img.url.replace('/uploads', '/uploads'))}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy">
+      <div class="image-thumb-placeholder" style="display:none">🖼️</div>` :
+      `<div class="image-thumb-placeholder">🖼️</div>`}
+      <div class="image-info">
+        <div class="image-name" title="${img.original_name}">${img.original_name}</div>
+        <div class="image-meta">
+          <span>${formatSize(img.file_size)}</span>
+          ${statusBadge(img.status)}
+        </div>
+        ${img.tags ? `<div class="image-tags">${img.tags.split(',').slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function statusBadge(status) {
+  const map = { done: ['badge-success', '✓ 已完成'], analyzing: ['badge-warning', '⏳ 分析中'], error: ['badge-danger', '✗ 失败'], pending: ['badge-secondary', '· 待处理'] };
+  const [cls, label] = map[status] || map.pending;
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '-';
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+  return (bytes / 1024 / 1024).toFixed(1) + 'MB';
+}
+
+function renderPagination(p) {
+  const el = document.getElementById('pagination');
+  if (p.totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = `<button class="page-btn" onclick="loadImages(${p.page - 1})" ${p.page <= 1 ? 'disabled' : ''}>‹</button>`;
+  for (let i = Math.max(1, p.page - 2); i <= Math.min(p.totalPages, p.page + 2); i++) {
+    html += `<button class="page-btn ${i === p.page ? 'active' : ''}" onclick="loadImages(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="loadImages(${p.page + 1})" ${p.page >= p.totalPages ? 'disabled' : ''}>›</button>`;
+  html += `<span style="font-size:13px;color:var(--gray-600);margin-left:6px">共 ${p.total} 张</span>`;
+  el.innerHTML = html;
+}
+
+// ── Select ──
+function toggleSelect(e, id) {
+  if (e.target.tagName === 'BUTTON') return;
+  if (state.selected.has(id)) state.selected.delete(id);
+  else state.selected.add(id);
+  renderImageGrid();
+  updateBatchActions();
+}
+
+function updateBatchActions() {
+  const count = state.selected.size;
+  const info = document.getElementById('selectedInfo');
+  const btn = document.getElementById('batchDeleteBtn');
+  if (count > 0) { info.textContent = `已选 ${count} 张`; btn.style.display = 'inline-flex'; }
+  else { info.textContent = ''; btn.style.display = 'none'; }
+}
+
+async function batchDelete() {
+  if (!confirm(`确认删除选中的 ${state.selected.size} 张图片？此操作不可恢复。`)) return;
+  try {
+    const res = await fetch(getUrl('/api/images'), {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(state.selected) })
+    });
+    const data = await res.json();
+    if (data.success) { toast(data.message, 'success'); state.selected.clear(); loadImages(); loadStats(); }
+  } catch (e) { toast('删除失败：' + e.message, 'error'); }
+}
+
+// ── Search ──
+function debounceSearch() {
+  clearTimeout(state.searchTimer);
+  state.searchTimer = setTimeout(() => loadImages(1), 400);
+}
+
+// ── Upload ──
+function handleFileSelect(files) {
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+  state.pendingFiles = Array.from(files).filter(f => allowed.includes(f.type));
+  if (!state.pendingFiles.length) { toast('请选择有效的图片文件', 'warning'); return; }
+  renderPreview();
+  document.getElementById('uploadActions').style.display = 'flex';
+  document.getElementById('uploadBtn').disabled = false;
+  showPage('upload');
+}
+
+function renderPreview() {
+  const list = document.getElementById('previewList');
+  list.innerHTML = state.pendingFiles.map((f, i) => `
+    <div style="text-align:center">
+      <img src="${URL.createObjectURL(f)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">
+      <div style="font-size:11px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray-700)">${f.name}</div>
+      <div style="font-size:11px;color:var(--gray-500)">${formatSize(f.size)}</div>
+    </div>
+  `).join('');
+}
+
+function clearPreview() {
+  state.pendingFiles = [];
+  document.getElementById('previewList').innerHTML = '';
+  document.getElementById('uploadActions').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+}
+
+async function doUpload() {
+  if (!state.pendingFiles.length) return;
+  const btn = document.getElementById('uploadBtn');
+  const progWrap = document.getElementById('progressWrap');
+  const progBar = document.getElementById('progressBar');
+  const progText = document.getElementById('progressText');
+
+  btn.disabled = true;
+  progWrap.style.display = 'block';
+  progText.textContent = `正在上传 ${state.pendingFiles.length} 张图片...`;
+  progBar.style.width = '30%';
+
+  try {
+    const formData = new FormData();
+    state.pendingFiles.forEach(f => formData.append('images', f));
+    progBar.style.width = '60%';
+    const res = await fetch(getUrl('/api/images/upload'), { method: 'POST', body: formData });
+    const data = await res.json();
+    progBar.style.width = '100%';
+    if (data.success) {
+      toast(data.message, 'success');
+      clearPreview();
+      setTimeout(() => { progWrap.style.display = 'none'; progBar.style.width = '0'; }, 800);
+      loadStats();
+      // 轮询更新分析状态
+      let checks = 0;
+      const poll = setInterval(() => {
+        loadImages(1); loadStats(); checks++;
+        if (checks > 10) clearInterval(poll);
+      }, 2000);
+    } else {
+      toast(data.message || '上传失败', 'error');
+    }
+  } catch (e) {
+    toast('上传失败：' + e.message, 'error');
+    progWrap.style.display = 'none';
+  }
+  btn.disabled = false;
+}
+
+// ── Modal ──
+async function openImageModal(id) {
+  state.currentImageId = id;
+  document.getElementById('imageModal').classList.add('open');
+  document.getElementById('modalBody').innerHTML = '<div style="width:100%;display:flex;align-items:center;justify-content:center;padding:40px"><div class="loading-spinner"></div></div>';
+  try {
+    const res = await fetch(getUrl(`/api/images/${id}`));
+    const data = await res.json();
+    if (data.success) renderModalContent(data.data);
+    else document.getElementById('modalBody').innerHTML = '<p style="color:red;padding:20px">加载失败</p>';
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML = '<p style="color:red;padding:20px">无法连接后端</p>';
+  }
+}
+
+function renderModalContent(img) {
+  const a = img.ai_analysis;
+  document.getElementById('modalTitle').textContent = img.original_name;
+
+  let aiHtml = '';
+  if (img.status === 'analyzing') {
+    aiHtml = `<div style="text-align:center;padding:20px"><div class="loading-spinner"></div><p style="margin-top:12px;color:var(--gray-600)">AI分析进行中...</p></div>`;
+  } else if (img.status === 'error') {
+    aiHtml = `<div style="color:var(--danger);padding:10px;background:var(--danger-light);border-radius:7px;font-size:13px">⚠️ 分析失败：${a?.error || '未知错误'}</div>`;
+  } else if (a) {
+    aiHtml = `
+      <div class="detail-section">
+        <div class="detail-section-title">🎯 识别摘要</div>
+        <div style="background:var(--primary-light);color:var(--primary);padding:10px 12px;border-radius:7px;font-size:13px;line-height:1.7">${a.summary || '-'}</div>
+      </div>
+      ${a.objects?.length ? `
+      <div class="detail-section">
+        <div class="detail-section-title">📌 识别结果（TOP 5）</div>
+        ${a.objects.map(obj => `
+          <div class="ai-item">
+            <span>${obj.name}</span>
+            <span style="color:var(--gray-600);font-size:12px">${obj.score}%</span>
+          </div>
+          <div class="confidence-bar"><div class="confidence-fill" style="width:${obj.score}%"></div></div>
+        `).join('')}
+      </div>` : ''}
+      ${a.text ? `
+      <div class="detail-section">
+        <div class="detail-section-title">📝 OCR识别文字</div>
+        <div class="ocr-text">${a.text}</div>
+      </div>` : ''}
+    `;
+  } else {
+    aiHtml = `<p style="color:var(--gray-600);font-size:13px">暂无分析结果</p>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-img-wrap">
+      <img class="modal-img" src="${getUrl(img.url)}" alt="${img.original_name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>'">
+    </div>
+    <div class="modal-details">
+      <div class="detail-section">
+        <div class="detail-section-title">📋 基础信息</div>
+        <div class="detail-row"><span class="detail-label">文件名</span><span class="detail-val">${img.original_name}</span></div>
+        <div class="detail-row"><span class="detail-label">文件大小</span><span class="detail-val">${formatSize(img.file_size)}</span></div>
+        <div class="detail-row"><span class="detail-label">格式</span><span class="detail-val">${img.mime_type || '-'}</span></div>
+        <div class="detail-row"><span class="detail-label">状态</span><span class="detail-val">${statusBadge(img.status)}</span></div>
+        <div class="detail-row"><span class="detail-label">上传时间</span><span class="detail-val">${new Date(img.created_at).toLocaleString('zh-CN')}</span></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">🤖 AI分析结果</div>
+        ${aiHtml}
+      </div>
+    </div>
+  `;
+}
+
+function closeModal() {
+  document.getElementById('imageModal').classList.remove('open');
+  state.currentImageId = null;
+}
+
+async function reanalyzeImage() {
+  if (!state.currentImageId) return;
+  try {
+    const res = await fetch(getUrl(`/api/images/${state.currentImageId}/reanalyze`), { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      toast('重新分析已启动', 'success');
+      setTimeout(() => openImageModal(state.currentImageId), 3000);
+    }
+  } catch (e) { toast('操作失败', 'error'); }
+}
+
+async function deleteImageFromModal() {
+  if (!state.currentImageId || !confirm('确认删除这张图片？')) return;
+  try {
+    const res = await fetch(getUrl(`/api/images/${state.currentImageId}`), { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) { toast('删除成功', 'success'); closeModal(); loadImages(); loadStats(); }
+  } catch (e) { toast('删除失败', 'error'); }
+}
+
+document.getElementById('imageModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('imageModal')) closeModal();
+});
+
+// ── Settings ──
+function loadSettings() {
+  document.getElementById('settingServerUrl').value = CONFIG.serverUrl;
+  const ak = localStorage.getItem('baiduApiKey');
+  const sk = localStorage.getItem('baiduSecretKey');
+  if (ak) document.getElementById('settingApiKey').value = ak;
+  if (sk) document.getElementById('settingSecretKey').value = sk;
+}
+
+function saveSettings() {
+  const url = document.getElementById('settingServerUrl').value.trim();
+  const ak = document.getElementById('settingApiKey').value.trim();
+  const sk = document.getElementById('settingSecretKey').value.trim();
+  if (url) { CONFIG.serverUrl = url; localStorage.setItem('serverUrl', url); }
+  if (ak) localStorage.setItem('baiduApiKey', ak);
+  if (sk) localStorage.setItem('baiduSecretKey', sk);
+  toast('配置已保存', 'success');
+  checkApiStatus();
+}
+
+async function testApiConnection() {
+  try {
+    const res = await fetch(getUrl('/api/health'), { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    if (data.success) toast('✅ 连接成功！后端服务运行正常', 'success');
+    else toast('⚠️ 后端返回异常', 'warning');
+  } catch (e) {
+    toast('❌ 连接失败：' + e.message, 'error');
+  }
+}
+
+// ── Auto refresh analyzing images ──
+setInterval(() => {
+  if (state.images.some(img => img.status === 'analyzing')) {
+    loadImages(); loadStats();
+  }
+}, 3000);
+</script>
+</body>
+</html>
